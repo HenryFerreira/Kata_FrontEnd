@@ -93,12 +93,11 @@ const List = () => {
           {
             state.list.map((element) => {
               return(
-                <div>
+                <tr key={element.id}>
                   <td>{element.id}</td>
                   <td>{element.name}</td>
-                  <td>{element.description}</td>
                   <td>{element.isCompleted}</td>
-                </div>
+                </tr>
               )
             })
           }
@@ -146,6 +145,7 @@ function App() {
   //Contenedor de componentes
   return (
       <StoreProvider>
+        <Form />
         <List />
       </StoreProvider>
   );
