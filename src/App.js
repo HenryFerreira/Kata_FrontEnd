@@ -4,7 +4,8 @@ import React, { createContext, useContext, useEffect, useReducer, useRef, useSta
 const HOST_API = "http://localhost:8080/api";
 //Estados iniciales para el Store
 const initialState = {
-  list: []
+  list: [],
+  item: {}
 };
 
 //Para utilizar el Store hay que delimitarlo como un contexto
@@ -16,8 +17,8 @@ const Form = () =>{
   //En este caso la referencia es la del formulario (form)
   //Se inicializa en nulo y el se crea (o inicializa) cuando el componente es montado
   const formRef = useRef(null);
-  //useContext --> nos da un estado externo
-  const { dispatch } = useContext(Store);//El Store es para guardar los estados internos de la app
+  //useContext --> nos da un estado externo, Se modifico para agregarle el estado local (state{item})
+  const { dispatch, state: {item} } = useContext(Store);//El Store es para guardar los estados internos de la app
   const [state, setState] = useState({});//Permite tener estados internos dentro del componente
 
   //Metodo para poder agregar la lista
@@ -52,16 +53,54 @@ const Form = () =>{
       });
   }
 
+  //Metodo para poder agregar la lista
+  const onEdit = (event) =>{
+    event.preventDefault();
+
+    //Respuesta --> lo que va a ser enviado en el body como un JSON
+    const request = {
+      name: state.name,
+      id: item.id,
+      isCompleted: item.isCompleted
+    };
+
+    //El featch se conecta al path de la url
+    fetch(HOST_API + "/todo", {
+      method: "PUT",//Indica que es un PUT
+      body: JSON.stringify(request),//Y que envia en el body un JSON
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    })
+      .then(response => response.json())//Transforma la promesa en un JSON
+      .then((element) => {
+        dispatch({
+          type: 'update-item',
+          item: element
+        });
+        setState({
+          name: ""
+        });
+        formRef.current.reset();
+      });
+  }
+
   return(
     <form ref={formRef}>
       <input
         type="text"
         name='name'
+        defaultValue={item.name}
         onChange={(event)=>{
           setState({...state, name: event.target.value})
         }}
       ></input>
-      <button onClick={onAdd}>Agregar</button>
+      {
+        item.id && <button onClick={onEdit}>Editar</button>
+      }
+      {
+        !item.id && <button onClick={onAdd}>Agregar</button>
+      }
     </form>
   )
 }
@@ -78,6 +117,22 @@ const List = () => {
       dispatch({type: "update-list", list})
     })
   }, [state.list.length, dispatch]);//Tienen que existir tanto el 'state.list' como el 'dispatch'
+
+  //para eliminar un item de la lista
+  const onDelete = (id) => {
+    //El featch se conecta al path de la url
+    fetch(HOST_API + "/" + id + "/todo", {
+      method: "DELETE"//Indica que es un DELETE
+    })
+      .then((list) => {
+        dispatch({type: 'delete-item', id})
+      })
+  };
+
+  //para editar un item de la lista
+  const onEdit = (element) => {
+    dispatch({type: 'edit-item', item: element})
+  };
 
   return (
     <div>
@@ -96,7 +151,11 @@ const List = () => {
                 <tr key={element.id}>
                   <td>{element.id}</td>
                   <td>{element.name}</td>
-                  <td>{element.isCompleted}</td>
+                  <td>{element.isCompleted === true ? "Si" : "No"}</td>
+                  <td>
+                    <button onClick={()=> onDelete(element.id)}> Eliminar </button>
+                    <button onClick={()=> onEdit(element)}> Editar </button>
+                  </td>
                 </tr>
               )
             })
@@ -111,8 +170,29 @@ const List = () => {
 //Funcion pura, Dada una entrada, siempre va a resibir la misma salida de esa entrada
 function reducer(state, action) {
   switch (action.type) {
+    //Se le agrego el actualizar el item al reducer
+    case 'update-item':{
+      const listUpdateEdit = state.list.map((element) => {
+        if(element.id === action.item.id){
+          return action.item;
+        }
+        return element;
+      });
+      return {...state, list: listUpdateEdit, element: {}}
+    }
+    //Se le agrego el eliminar al reducer
+    case 'delete-item':{
+      const listUpdate = state.list.filter((element) => {
+        return element.id !== action.id;
+      });
+      return {...state, list: listUpdate}
+    }
     case 'update-list':{
       return {...state, list: action.list};
+    }
+    //Se le agrego el editar item al reducer
+    case 'edit-item':{
+      return {...state, item: action.item};
     }
     case 'add-item':{
       const newList = state.list;
